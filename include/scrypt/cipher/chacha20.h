@@ -33,6 +33,8 @@ void scrypt_chacha20_xor(scrypt_chacha20_ctx *ctx,
 
 void scrypt_chacha20_wipe(scrypt_chacha20_ctx *ctx);
 
+void scrypt_hchacha20(const uint8_t key[32], const uint8_t nonce16[16], uint8_t subkey[32]);
+
 #ifdef __cplusplus
 }
 #endif

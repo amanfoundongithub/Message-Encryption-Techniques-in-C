@@ -94,3 +94,31 @@ void scrypt_chacha20_xor(scrypt_chacha20_ctx *ctx,
 void scrypt_chacha20_wipe(scrypt_chacha20_ctx *ctx) {
     scrypt_zeroize(ctx, sizeof(*ctx));
 }
+
+static void chacha20_rounds(uint32_t x[16]) {
+    for (unsigned i = 0u; i < 10u; i++) {
+        QUARTERROUND(x[0], x[4],  x[8], x[12]);
+        QUARTERROUND(x[1], x[5],  x[9], x[13]);
+        QUARTERROUND(x[2], x[6], x[10], x[14]);
+        QUARTERROUND(x[3], x[7], x[11], x[15]);
+
+        QUARTERROUND(x[0], x[5], x[10], x[15]);
+        QUARTERROUND(x[1], x[6], x[11], x[12]);
+        QUARTERROUND(x[2], x[7],  x[8], x[13]);
+        QUARTERROUND(x[3], x[4],  x[9], x[14]);
+    }
+}
+
+void scrypt_hchacha20(const uint8_t key[32], const uint8_t nonce16[16], uint8_t subkey[32]) {
+    uint32_t x[16];
+    x[0] = 0x61707865u;
+    x[1] = 0x3320646eu;
+    x[2] = 0x79622d32u;
+    x[3] = 0x6b206574u;
+    for (unsigned i = 0u; i < 8u; i++) x[4u + i] = scrypt_load32_le(key + i * 4u);
+    for (unsigned i = 0u; i < 4u; i++) x[12u + i] = scrypt_load32_le(nonce16 + i * 4u);
+    chacha20_rounds(x);
+    for (unsigned i = 0u; i < 4u; i++) scrypt_store32_le(subkey + i * 4u, x[i]);
+    for (unsigned i = 0u; i < 4u; i++) scrypt_store32_le(subkey + 16u + i * 4u, x[12u + i]);
+    scrypt_zeroize(x, sizeof(x));
+}
