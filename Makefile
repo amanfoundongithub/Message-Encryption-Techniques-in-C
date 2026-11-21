@@ -1,68 +1,55 @@
-CC       ?= cc
-AR       ?= ar
-MKDIR_P  ?= mkdir -p
+CC          ?= cc
+AR          ?= ar
+CFLAGS      ?= -std=c99 -O2 -Wall -Wextra -Wshadow -Wconversion -Wpedantic -Iinclude -Isrc
+SAN_FLAGS   := -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
 
-STDFLAGS := -std=c99
-WARNFLAGS:= -Wall -Wextra -Wshadow -Wconversion -Wpedantic
-INCFLAGS := -Iinclude -Isrc
-OPTFLAGS := -O2
+BUILD_DIR   := build
+LIB_TARGET  := $(BUILD_DIR)/libscrypt.a
 
-# Separate release flags from sanitizer test flags so object files don't collide
-CFLAGS   := $(STDFLAGS) $(OPTFLAGS) $(WARNFLAGS) $(INCFLAGS)
-SANFLAGS := $(STDFLAGS) -O1 -g $(WARNFLAGS) $(INCFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer
+# Source files for the static library
+SRCS        := src/cipher/des.c src/cipher/aes.c src/hash/sha256.c
+OBJS        := $(patsubst src/%.c,$(BUILD_DIR)/obj/%.o,$(SRCS))
 
-BUILD_DIR := build
-OBJ_DIR   := $(BUILD_DIR)/obj
-SAN_DIR   := $(BUILD_DIR)/san
-BIN_DIR   := $(BUILD_DIR)/bin
-LIB_NAME  := $(BUILD_DIR)/libscrypt.a
+# Test sources and test binaries in build/bin/
+TEST_SRCS   := tests/test_des.c tests/test_aes.c tests/test_sha256.c
+TEST_BINS   := $(patsubst tests/%.c,$(BUILD_DIR)/bin/%,$(TEST_SRCS))
 
-# Add new source files here as your library grows
-SRCS := \
-	src/cipher/des.c
+.PHONY: all test test-san clean
 
-OBJS     := $(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
-SAN_OBJS := $(patsubst src/%.c,$(SAN_DIR)/%.o,$(SRCS))
+all: $(LIB_TARGET)
 
-TEST_SRCS := \
-	tests/test_des.c
-
-TEST_BINS := $(patsubst tests/%.c,$(BIN_DIR)/%,$(TEST_SRCS))
-
-.PHONY: all test clean help
-
-all: $(LIB_NAME)
-
-$(LIB_NAME): $(OBJS)
-	@$(MKDIR_P) $(dir $@)
-	$(AR) rcs $@ $^
-
-# Normal library objects
-$(OBJ_DIR)/%.o: src/%.c
-	@$(MKDIR_P) $(dir $@)
+# Compile library object files into build/obj/
+$(BUILD_DIR)/obj/%.o: src/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Sanitized objects for test binaries
-$(SAN_DIR)/%.o: src/%.c
-	@$(MKDIR_P) $(dir $@)
-	$(CC) $(SANFLAGS) -c $< -o $@
+# Archive into static library
+$(LIB_TARGET): $(OBJS)
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
 
-# Build and run all test executables with ASan + UBSan
-$(BIN_DIR)/%: tests/%.c $(SAN_OBJS)
-	@$(MKDIR_P) $(dir $@)
-	$(CC) $(SANFLAGS) $< $(SAN_OBJS) -o $@
+# Build test binaries linked against libscrypt.a
+$(BUILD_DIR)/bin/test_%: tests/test_%.c $(LIB_TARGET)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< $(LIB_TARGET) -o $@
 
+# Run all test binaries
 test: $(TEST_BINS)
 	@for bin in $(TEST_BINS); do \
 		echo "Running $$bin..."; \
 		"$$bin" || exit 1; \
 	done
 
+# Sanitizer build
+test-san:
+	@mkdir -p $(BUILD_DIR)/san/bin
+	$(CC) $(CFLAGS) $(SAN_FLAGS) $(SRCS) tests/test_des.c -o $(BUILD_DIR)/san/bin/test_des
+	$(CC) $(CFLAGS) $(SAN_FLAGS) $(SRCS) tests/test_aes.c -o $(BUILD_DIR)/san/bin/test_aes
+	$(CC) $(CFLAGS) $(SAN_FLAGS) $(SRCS) tests/test_sha256.c -o $(BUILD_DIR)/san/bin/test_sha256
+	@echo "Running sanitizer tests..."
+	./$(BUILD_DIR)/san/bin/test_des
+	./$(BUILD_DIR)/san/bin/test_aes
+	./$(BUILD_DIR)/san/bin/test_sha256
+
 clean:
 	rm -rf $(BUILD_DIR)
-
-help:
-	@echo "Targets:"
-	@echo "  all    Build static library $(LIB_NAME)"
-	@echo "  test   Build and run tests with ASan and UBSan"
-	@echo "  clean  Remove $(BUILD_DIR)"
