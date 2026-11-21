@@ -7,11 +7,11 @@ BUILD_DIR   := build
 LIB_TARGET  := $(BUILD_DIR)/libscrypt.a
 
 # Source files for the static library
-SRCS        := src/cipher/des.c src/cipher/aes.c src/hash/sha256.c
+SRCS        := src/cipher/des.c src/cipher/aes.c src/hash/sha256.c src/cipher/chacha20.c
 OBJS        := $(patsubst src/%.c,$(BUILD_DIR)/obj/%.o,$(SRCS))
 
 # Test sources and test binaries in build/bin/
-TEST_SRCS   := tests/test_des.c tests/test_aes.c tests/test_sha256.c
+TEST_SRCS   := tests/test_des.c tests/test_aes.c tests/test_sha256.c tests/test_chacha20.c
 TEST_BINS   := $(patsubst tests/%.c,$(BUILD_DIR)/bin/%,$(TEST_SRCS))
 
 .PHONY: all test test-san clean
