@@ -49,4 +49,10 @@ static inline void scrypt_store64_be(uint8_t b[8], uint64_t v) {
     b[7] = (uint8_t)(v);
 }
 
-#endif
+static inline void scrypt_store64_le(uint8_t b[8], uint64_t v) {
+    for (unsigned i = 0u; i < 8u; i++) {
+        b[i] = (uint8_t)(v >> (8u * i));
+    }
+}
+
+#endif 
